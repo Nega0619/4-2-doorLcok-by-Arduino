@@ -1,7 +1,9 @@
 #include <Servo.h>
+#include <Keypad.h>
+#include <LiquidCrystal_I2C.h>
+LiquidCrystal_I2C mLcd(0x27, 16, 2);
 
 #define SERVO    3     // Servo Motor Control Pin
-
 #define C1 8
 #define C2 9
 #define C3 10
@@ -13,51 +15,93 @@
 #define greenLight A0
 #define redLight A1
 #define buzzer 13
+#define ROWS  4
+#define COLS  4
 
 Servo myServo;
+
+char PW[5] = {'1','2','3','4','\0'}; // 비밀번호
+byte rowP[ROWS] = {R4,R3,R2,R1};
+byte colP[COLS] = {C4,C3,C2,C1};
+char mkeyAr[ROWS][COLS] = {
+{'1','2','3','A'},
+{'4','5','6','B'},
+{'7','8','9','C'},
+{'*','0','#','D'}};
+Keypad mKeyPad = Keypad(makeKeymap(mkeyAr),rowP, colP,ROWS,COLS);
 
 void setup( ) {
 Serial.begin(9600);
 myServo.attach(SERVO);
+myServo.write(700);
 pinMode(greenLight, OUTPUT);
 pinMode(redLight, OUTPUT);
 digitalWrite(greenLight, LOW);
 digitalWrite(redLight, LOW);
-pinMode(C1, INPUT_PULLUP);
-pinMode(C2, INPUT_PULLUP);
-pinMode(C3, INPUT_PULLUP);
-pinMode(C4, INPUT_PULLUP);
-pinMode(R1, OUTPUT); digitalWrite(R1, 1);
-pinMode(R2, OUTPUT); digitalWrite(R2, 1);
-pinMode(R3, OUTPUT); digitalWrite(R3, 1);
-pinMode(R4, OUTPUT); digitalWrite(R4, 1);
+mLcd.init();
+mLcd.backlight();
+mLcd.print("----");
+mLcd.setCursor(0, 0);
 }
+
 void loop( ) {
-digitalWrite(R1, 0);
-if (digitalRead(C1) == 0) {Serial.println("S16"); digitalWrite(greenLight, HIGH);}
-if (digitalRead(C2) == 0) {Serial.println("S15"); digitalWrite(greenLight, LOW);}
-if (digitalRead(C3) == 0) {Serial.println("S14"); digitalWrite(redLight, HIGH);}
-if (digitalRead(C4) == 0) {Serial.println("S13"); digitalWrite(redLight, LOW);}
-digitalWrite(R1, 1);
-digitalWrite(R2, 0);
-if (digitalRead(C1) == 0) {Serial.println("S12");tone(buzzer, 262, 100);delay(100);tone(buzzer, 330, 100);delay(100);tone(buzzer, 392, 100); } //열림
-if (digitalRead(C2) == 0) {Serial.println("S11");tone(buzzer, 392, 100);delay(100);tone(buzzer, 330, 100);delay(100);tone(buzzer, 262, 100); } //잠김
-if (digitalRead(C3) == 0) {Serial.println("S10");    myServo.write(1450);
-    delay(3000);
-    myServo.write(500);
-    delay(3000);}
-if (digitalRead(C4) == 0) {Serial.println("S9");}
-digitalWrite(R2, 1);
-digitalWrite(R3, 0);
-if (digitalRead(C1) == 0) {Serial.println("S8");}
-if (digitalRead(C2) == 0) {Serial.println("S7");}
-if (digitalRead(C3) == 0) {Serial.println("S6");}
-if (digitalRead(C4) == 0) {Serial.println("S5");}
-digitalWrite(R3, 1);
-digitalWrite(R4, 0);
-if (digitalRead(C1) == 0) {Serial.println("S4");}
-if (digitalRead(C2) == 0) {Serial.println("S3");}
-if (digitalRead(C3) == 0) {Serial.println("S2");}
-if (digitalRead(C4) == 0) {Serial.println("S1");}
-digitalWrite(R4, 1);
+  char keyV = mKeyPad.getKey();
+  char pwAr[5] = {'0', '0', '0', '0', '\0'};
+  int i = 0;
+  while(1)
+  {
+    keyV = mKeyPad.waitForKey();
+    if(keyV == '*')
+      break;
+    tone(buzzer, 2093, 250);
+    if(i != 0)
+    {
+      mLcd.setCursor(i-1, 0);
+      mLcd.print('*');
+    }
+    mLcd.setCursor(i, 0);
+    mLcd.print(keyV);
+    pwAr[i] = keyV;
+    i++;
+  }
+  if(strcmp(PW, pwAr)==0)
+  {
+    unlock();
+  }
+  else
+  {
+    incorrect();
+  }
+}
+
+void unlock()
+{
+  digitalWrite(greenLight, HIGH);
+  tone(buzzer, 262, 100); delay(100);
+  tone(buzzer, 330, 100); delay(100);
+  tone(buzzer, 392, 100);
+  myServo.write(1650);
+  mLcd.clear();
+  delay(3000);
+  digitalWrite(greenLight, LOW);
+  tone(buzzer, 392, 100); delay(100);
+  tone(buzzer, 330, 100); delay(100);
+  tone(buzzer, 262, 100);
+  myServo.write(700);
+  mLcd.print("----");
+  mLcd.setCursor(0, 0);
+  delay(1000);
+}
+
+void incorrect()
+{
+  tone(buzzer, 2093, 300); digitalWrite(redLight, HIGH);
+  delay(250); digitalWrite(redLight, LOW); delay(250);
+  tone(buzzer, 2093, 300); digitalWrite(redLight, HIGH);
+  delay(250); digitalWrite(redLight, LOW); delay(250);
+  tone(buzzer, 2093, 300); digitalWrite(redLight, HIGH);
+  delay(250); digitalWrite(redLight, LOW); delay(250);
+  mLcd.clear();
+  mLcd.print("----");
+  mLcd.setCursor(0, 0);
 }
