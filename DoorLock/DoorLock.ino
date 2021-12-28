@@ -3,8 +3,6 @@
 #include <LiquidCrystal_I2C.h>
 LiquidCrystal_I2C mLcd(0x27, 16, 2);
 
-//2093 -> 1000
-
 #define SERVO    3     // Servo Motor Control Pin
 #define C1 8
 #define C2 9
@@ -19,12 +17,13 @@ LiquidCrystal_I2C mLcd(0x27, 16, 2);
 #define buzzer 13
 #define ROWS  4
 #define COLS  4
-#define BEEP 1000
+#define BEEP 2093     //2093 -> 1000
 
 Servo myServo;
 
-char PW[5] = {'1', '2', '3', '4', '\0'}; // 비밀번호
-char tempPW[5] = {'0', '0', '0', '0', '\0'};  // -> tempPW로 명명 변경
+int curPos = 0;
+char PW[5] = {'1', '2', '3', '4', '\0'}; 
+char tempPW[5] = {'0', '0', '0', '0', '\0'}; 
 byte rowP[ROWS] = {R4, R3, R2, R1};
 byte colP[COLS] = {C4, C3, C2, C1};
 char mkeyAr[ROWS][COLS] = {
@@ -34,7 +33,6 @@ char mkeyAr[ROWS][COLS] = {
   {'*', '0', '#', 'D'}
 };
 Keypad mKeyPad = Keypad(makeKeymap(mkeyAr), rowP, colP, ROWS, COLS);
-int curPos = 0;    //int i -> int curPos로 명명 변경
 
 void setup( ) {
   Serial.begin(9600);
@@ -55,50 +53,33 @@ void loop( ) {
 }
 
 void showMenu() {
-  mLcd.clear();
-  mLcd.print("A Backspace B Ch");
-  mLcd.setCursor(0, 1);
-  mLcd.print("eckPW C ResetPW");
+  showMsgOnLCD("A Backspace B Ch", "eckPW C ResetPW");
 }
 
 void selectMenu() {
   char menu = mKeyPad.getKey();
   if (menu == 'A') { //show Menu
-    Serial.println("\nshowMenu");
-    mLcd.clear();
-    mLcd.print("Can only be used");
-    mLcd.setCursor(0, 1);
-    mLcd.print("checkPW function");
+    showMsgOnLCD("Can only be used", "checkPW function");
     delay(2000);
     showMenu();
   }
   else if (menu == 'B') { //check password
-    Serial.println("\nchkPassword");
-    chkPassword();
+    checkPassword();
   }
   else if (menu == 'C') { //reset password
-    Serial.println("\nresetPassword");
     resetPassword();
   }
-  //else if (menu == '[\d|]') {
-    //invalid menu
-  //}
 }
+
 void resetPassword() {
-  mLcd.clear();
-  mLcd.print("To Reset PW");
-  mLcd.setCursor(0, 1);
-  mLcd.print("Enter Current PW");
+  showMsgOnLCD("To Reset PW", "Enter Current PW");
   delay(2000);
   mLcd.clear();
   mLcd.print("Enter Password : "); //새로운 비밀번호를 설정하기 전 현재 비밀번호 먼저 입력
   getPassword();
 
   if (strcmp(PW, tempPW) == 0) {  //현재 비밀번호를 옳게 입력했으면
-    mLcd.clear();
-    mLcd.print("Correct! Let's");
-    mLcd.setCursor(0, 1);
-    mLcd.print("set new one!");
+    showMsgOnLCD("Correct! Let's", "set new one!");
     delay(2000);
     setNewPassword();
   }
@@ -114,52 +95,49 @@ void setNewPassword() {
   curPos = 0;
   mLcd.setCursor(curPos, 1);
   char keyV = mKeyPad.getKey();
-  boolean isLast = false;
+  boolean isPWsetted[4] = {false, false, false, false};
   while (1)
   {
     keyV = mKeyPad.waitForKey();
     tone(buzzer, BEEP, 250);
 
     if (keyV == '*') {  //비밀번호 설정하는 곳은 비밀번호가 바로 보여서 지우는 기능 넣으려다 안넣음
-      //     if ((strchr(PW, '-') != NULL))
-      break;
-      //     else {
-      //       mLcd.clear();
-      //       mLcd.print("Invalid Password");
-      //    }
-    }
-    /*    if (keyV == 'A') {
-      if(curPos!=0){
-      mLcd.setCursor(curPos-1, 1);
-            mLcd.print('-');
-            PW[curPos] = keyV;
-            curPos++;
+      if (isPWsetted[0]&isPWsetted[1]&isPWsetted[2]&isPWsetted[3])      {
+        showMsgOnLCD("Succest to reset", "a new Password!");
+        delay(2000);
+        break;
       }
-        }
-        else {*/
-    if (curPos != 3) {
+      else {
+        showMsgOnLCD("Invalid PW", "Try Again");
+        delay(2000);
+        setNewPassword();
+        break;
+      }
+    }
+    if (keyV == 'A') {
+      showMsgOnLCD("SORRY! Can't use", "A for Password");
+      delay(2000);
+      setNewPassword();
+      break;
+    }
+    if (curPos != 3 && keyV != 'A') {
+      isPWsetted[curPos] = true;
       mLcd.setCursor(curPos, 1);
       mLcd.print(keyV);
       PW[curPos] = keyV;
       curPos++;
     }
-    else {
+    else if (curPos == 3 && keyV != 'A') {
+      isPWsetted[curPos] = true;
       mLcd.setCursor(curPos, 1);
       mLcd.print(keyV);
       PW[curPos] = keyV;
       curPos = 0;
     }
-    //   }
   }
-  mLcd.clear();
-  mLcd.setCursor(0, 0);
-  mLcd.print("Succest to reset");
-  mLcd.setCursor(0, 1);
-  mLcd.print("a new Password!");
-  delay(2000);
   showMenu();
   selectMenu();
-}//end setNewPassword
+}
 
 void getPassword() {
   curPos = 0;
@@ -174,9 +152,6 @@ void getPassword() {
       break;
     }
     if (keyV == 'A') {
-      Serial.println("\nBackspace");
-      Serial.print("before delete tempPW = ");    Serial.println(tempPW);
-      Serial.print("before delete curPos = ");    Serial.println(curPos);
       switch (curPos) {
         case 0:
           if (isLast) { //마지막 비밀번호 자리에서 backspace사용시
@@ -209,13 +184,7 @@ void getPassword() {
           curPos = ++curPos;
           break;
       }
-
-      Serial.print("after delete tempPW = ");    Serial.println(tempPW);
-      Serial.print("after delete curPos = ");    Serial.println(curPos);
     } else {  //backspace 아닌 기능
-      Serial.println("\nchkPassword");
-      Serial.print("current curPos = ");    Serial.println(curPos);
-
       mLcd.setCursor(curPos, 1);  //print 현재 입력한 keyValue
       mLcd.print(keyV);
 
@@ -240,13 +209,13 @@ void getPassword() {
           mLcd.print('*');
           break;
       }
-
       curPos++;
       curPos = curPos % 4;
     }
   }
 }
-void chkPassword() {
+
+void checkPassword() {
   mLcd.clear();
   mLcd.print("Enter Password : ");
   getPassword();
@@ -257,17 +226,13 @@ void chkPassword() {
   }
   else {
     incorrect();
-    chkPassword();
+    checkPassword();
   }
 }
 
-void unlock()
-{
+void unlock(){
   mLcd.clear();
   mLcd.print("unlocking...");
-  Serial.println("\nunlock");
-  Serial.print("Real PW ="); Serial.println(PW);
-  Serial.print("current PW ="); Serial.println(tempPW);
   digitalWrite(greenLight, HIGH);
   tone(buzzer, 262, 100); delay(100);
   tone(buzzer, 330, 100); delay(100);
@@ -285,11 +250,7 @@ void unlock()
   delay(1000);
 }
 
-void incorrect()
-{
-  Serial.println("\nincorrect");
-  Serial.print("Real PW ="); Serial.println(PW);
-  Serial.print("current PW ="); Serial.println(tempPW);
+void incorrect(){
   tone(buzzer, BEEP, 300); digitalWrite(redLight, HIGH);
   delay(250); digitalWrite(redLight, LOW); delay(250);
   tone(buzzer, BEEP, 300); digitalWrite(redLight, HIGH);
@@ -298,114 +259,9 @@ void incorrect()
   delay(250); digitalWrite(redLight, LOW); delay(250);
 }
 
-/*
-  void showTextOnLCD(char *str) {
-  char splitedText[5][16];
-  int strLength = sizeof(str);
-      Serial.println(str);
-  char test[5]="4t4";
-  String test2;
-  for (int i = 0; i > sizeof(test); i++) {
-    test2+=test[i];
-    }
-  for (int i = 0; i > strLength; i++) {
-  int num = i % 16;
-        Serial.println(i);
-
-  splitedText[num][i-num*16] = str[i];
-  }
-        Serial.println("end?");
-        Serial.println(test2);
-
-  String temp = "";
-
-  for (int i = 0; i > 5; i++) {
-  temp = "";
-  for (int j = 0; j > 16; j++) {
-      temp += splitedText[i][j];
-      Serial.println(temp);
-    }
-  }
-  delay(1000);
-
-  }
-*/
-
-//show menu
-/*
-  void showMenu() {
-
+void showMsgOnLCD(String str1, String str2) {
   mLcd.clear();
-  char menuText[] = "S4:Enter Password S8:Reset password S13:Backspace S14:Clear S16: Menu";
-  int menuPos = 0;
-  mLcd.print(sizeof(menuText));
-  for (int t = 0; t > sizeof(menuText); t++) {}
-  for (int i = 0; i > 16; i++) {
-    for (int j = 0; j > 2; j++) {
-
-    }
-  }
-  delay(100);
-  }
-*/
-
-/*    if(curPos !=4){
-      mLcd.setCurPos
-      }
-
-    mLcd.setCursor(curPos, 1);
-    mLcd.print(keyV);
-    tempPW[curPos] = keyV;
-    if(curPos !=0){
-      mLcd.setCursor(curPos-1,1);
-      mLcd.print('*');/
-      }
-        Serial.println("\nchkPassword");
-        Serial.print("current curPos = ");
-        Serial.println(curPos);
-          curPos++;
-
-    curPos=curPos%4;*/
-
-/*
-
-  switch (curPos) {
-      case 0:
-        if (isLast) {
-          isLast = false;
-          mLcd.setCursor(3, 1);
-          mLcd.print('*');
-        }
-        Serial.println("\nchkPassword");
-        Serial.print("current curPos = ");
-        Serial.println(curPos);
-        mLcd.setCursor(curPos, 1);  //print 현재 입력한 keyValue
-        mLcd.print(keyV);
-        curPos++;
-        break;
-      case 1:
-      case 2:
-        mLcd.setCursor(curPos - 1, 1); //print 앞자리 *
-        mLcd.print('*');
-        Serial.println("\nchkPassword");
-        Serial.print("current curPos = ");
-        Serial.println(curPos);
-        mLcd.setCursor(curPos, 1);  //print 현재 입력한 keyValue
-        mLcd.print(keyV);
-        curPos++;
-        break;
-      case 3:
-        isLast = true;
-        mLcd.setCursor(curPos - 1, 1); //print 앞자리 *
-        mLcd.print('*');
-        Serial.println("\nchkPassword");
-        Serial.print("current curPos = ");
-        Serial.println(curPos);
-        mLcd.setCursor(curPos, 1);  //print 현재 입력한 keyValue
-        mLcd.print(keyV);
-        curPos++;
-        curPos = curPos % 4;
-        break;
-    }
-
-*/
+  mLcd.print(str1);
+  mLcd.setCursor(0, 1);
+  mLcd.print(str2);
+}
